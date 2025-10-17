@@ -1,18 +1,82 @@
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
-import javax.swing.border.MatteBorder;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+// JDBC Imports
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
+import java.util.Random;
+
+// CRITICAL FIX 1: Import the TrainDetails class from SearchTrainFrame.java
+// If SearchTrainFrame is in the default package, no import statement is needed.
+// If it is in a package, you would need: import com.yourpackage.SearchTrainFrame.TrainDetails;
+
 
 public class BookingFrame extends JFrame {
+
+    public static class DBManager {
+
+        private static final String DB_URL = "jdbc:mysql://localhost:3306/railway_db";
+        private static final String USER = "root";
+        private static final String PASS = "root";
+
+        public Connection getConnection() throws SQLException {
+            // FIX: Added Class.forName for robust driver loading
+            try {
+                Class.forName("com.mysql.cj.jdbc.Driver");
+            } catch (ClassNotFoundException e) {
+                throw new SQLException("MySQL JDBC Driver not found: " + e.getMessage());
+            }
+            return java.sql.DriverManager.getConnection(DB_URL, USER, PASS);
+        }
+
+        public boolean saveBooking(String trainId, String passengerName, int age, String travelClass, int seats, int totalAmount) {
+            String sql = "INSERT INTO bookings (train_id, passenger_name, age, travel_class, seats, total_amount, booking_reference) VALUES (?, ?, ?, ?, ?, ?, ?)";
+            String bookingRef = generateBookingReference();
+
+            try (Connection conn = getConnection();
+                 PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+                pstmt.setString(1, trainId);
+                pstmt.setString(2, passengerName);
+                pstmt.setInt(3, age);
+                pstmt.setString(4, travelClass);
+                pstmt.setInt(5, seats);
+                pstmt.setInt(6, totalAmount);
+                pstmt.setString(7, bookingRef);
+
+                pstmt.executeUpdate();
+                return true;
+            } catch (SQLException e) {
+                JOptionPane.showMessageDialog(null, "Database error during booking: " + e.getMessage(), "DB Error", JOptionPane.ERROR_MESSAGE);
+                return false;
+            }
+        }
+
+        private String generateBookingReference() {
+            // Simple 8-character reference code
+            String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+            Random random = new Random();
+            StringBuilder sb = new StringBuilder(8);
+            for (int i = 0; i < 8; i++) {
+                sb.append(chars.charAt(random.nextInt(chars.length())));
+            }
+            return sb.toString();
+        }
+    }
+    // End of DBManager
 
     public static void main(String[] args) {
         String os = System.getProperty("os.name").toLowerCase();
         if (os.contains("win")) System.setProperty("sun.java2d.d3d", "true");
         else System.setProperty("sun.java2d.opengl", "true");
 
-        SwingUtilities.invokeLater(() -> new BookingFrame(SearchTrainFrame.MOCK_TRAINS.get(0)));
+        // Mock train data for standalone testing
+        // You MUST use SearchTrainFrame.TrainDetails here!
+        SearchTrainFrame.TrainDetails mockTrain = new SearchTrainFrame.TrainDetails("12051", "Janshatabdi Express", 1200, 500, 1800);
+        SwingUtilities.invokeLater(() -> new BookingFrame(mockTrain));
     }
 
     private final Color PRIMARY_COLOR = new Color(255, 215, 0);
@@ -23,9 +87,12 @@ public class BookingFrame extends JFrame {
     private final int RADIUS = 8;
     private static final String RUPEE_SYMBOL = "\u20B9";
 
+    // IMPORTANT: The type here must match the type in SearchTrainFrame!
     private final SearchTrainFrame.TrainDetails selectedTrain;
     private JTextField trainNameField, seatCountField;
+    private final DBManager dbManager = new DBManager();
 
+    // IMPORTANT: The constructor must accept SearchTrainFrame.TrainDetails!
     public BookingFrame(SearchTrainFrame.TrainDetails trainDetails) {
         this.selectedTrain = trainDetails;
 
@@ -99,26 +166,34 @@ public class BookingFrame extends JFrame {
         gbc.anchor = GridBagConstraints.CENTER;
         formPanel.add(confirmBtn, gbc);
 
-        // Logic update: window stays open after booking
         confirmBtn.addActionListener(e -> {
             try {
                 String name = passengerName.getText().trim();
-                String age = ageField.getText().trim();
+                String ageStr = ageField.getText().trim();
                 int seats = Integer.parseInt(seatCountField.getText().trim());
                 String selectedClass = (String) classBox.getSelectedItem();
 
-                if (name.isEmpty() || age.isEmpty() || seats <= 0) {
+                if (name.isEmpty() || ageStr.isEmpty() || seats <= 0) {
                     JOptionPane.showMessageDialog(this, "Please fill all fields correctly.", "Input Error", JOptionPane.ERROR_MESSAGE);
                     return;
                 }
 
-                int totalAmount = calculatePrice(selectedTrain, selectedClass, seats);
-                JOptionPane.showMessageDialog(this,
-                        String.format("Booking Confirmed!\n\nTrain: %s (%s)\nSeats: %d\nTotal: %s%d",
-                                selectedTrain.name, selectedClass, seats, RUPEE_SYMBOL, totalAmount),
-                        "Booking Confirmation", JOptionPane.INFORMATION_MESSAGE);
+                int age = Integer.parseInt(ageStr);
 
-                // Do not dispose(); keep the window open
+                int totalAmount = calculatePrice(selectedTrain, selectedClass, seats);
+
+                if (dbManager.saveBooking(selectedTrain.id, name, age, selectedClass, seats, totalAmount)) {
+                    JOptionPane.showMessageDialog(this,
+                            String.format("Booking Confirmed! ✅\n\nTrain: %s\nClass: %s\nSeats: %d\nTotal: %s%d",
+                                    selectedTrain.name, selectedClass, seats, RUPEE_SYMBOL, totalAmount),
+                            "Booking Confirmation", JOptionPane.INFORMATION_MESSAGE);
+                }
+
+                // Clear fields for new booking
+                passengerName.setText("");
+                ageField.setText("");
+                seatCountField.setText("1");
+                classBox.setSelectedIndex(0);
 
             } catch (NumberFormatException ex) {
                 JOptionPane.showMessageDialog(this, "Age and Seats must be numbers.", "Input Error", JOptionPane.ERROR_MESSAGE);
@@ -131,7 +206,18 @@ public class BookingFrame extends JFrame {
     }
 
     private int calculatePrice(SearchTrainFrame.TrainDetails train, String cls, int seats) {
-        int basePrice = cls.equals("AC") ? train.basePriceAC : cls.equals("Sleeper") ? train.basePriceSleeper : train.basePriceBusiness;
+        int basePrice = 0;
+        switch (cls) {
+            case "AC":
+                basePrice = train.basePriceAC;
+                break;
+            case "Sleeper":
+                basePrice = train.basePriceSleeper;
+                break;
+            case "Business":
+                basePrice = train.basePriceBusiness;
+                break;
+        }
         return basePrice * seats;
     }
 

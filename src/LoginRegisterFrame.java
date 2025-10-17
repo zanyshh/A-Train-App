@@ -1,47 +1,110 @@
-import javax.swing.*; // Swing GUI components
-import java.awt.*; // Layouts, colors, cursors
-import javax.swing.border.EmptyBorder; // Empty border for spacing
-import javax.swing.border.MatteBorder; // Underline border
-import java.awt.event.MouseAdapter; // Mouse events
-import java.awt.event.MouseEvent; 
-import javax.swing.border.Border; 
-import java.util.HashMap; // Store mock users
-import java.util.Map; 
+import javax.swing.*;
+import java.awt.*;
+import javax.swing.border.EmptyBorder;
+import javax.swing.border.MatteBorder;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import javax.swing.border.Border;
+// JDBC
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.awt.event.ActionListener;
+import java.awt.event.ActionEvent;
 
 public class LoginRegisterFrame extends JFrame {
     
-    
-    
-    
-    
-    
-    //Use D3D (directX 3D on windows and opengl on unix based system
-    public static void main(String[] args) {
-    String os = System.getProperty("os.name").toLowerCase();
-    if (os.contains("win")) {
-        System.setProperty("sun.java2d.d3d", "true"); // Windows
-    } else {
-        System.setProperty("sun.java2d.opengl", "true"); // Linux/macOS
+    // --- DBManager Class ---
+    public static class DBManager {
+        
+        private static final String DB_URL = "jdbc:mysql://localhost:3306/railway_db";
+        private static final String USER = "root";
+        private static final String PASS = "root"; // <-- Ensure this is your actual MySQL root password
+        
+        public Connection getConnection() throws SQLException {
+             // Added Class.forName for robust driver loading (especially with modern JDKs)
+             try {
+                 Class.forName("com.mysql.cj.jdbc.Driver"); 
+             } catch (ClassNotFoundException e) {
+                 // In case the driver JAR is somehow not on the classpath
+                 throw new SQLException("MySQL JDBC Driver not found: " + e.getMessage());
+             }
+             return java.sql.DriverManager.getConnection(DB_URL, USER, PASS);
+        }
+
+        public boolean authenticateUser(String username, String password) {
+            String sql = "SELECT password FROM users WHERE username = ?";
+            try (Connection conn = getConnection();
+                 PreparedStatement pstmt = conn.prepareStatement(sql)) {
+                
+                pstmt.setString(1, username);
+                try (ResultSet rs = pstmt.executeQuery()) {
+                    if (rs.next()) {
+                        String storedPassword = rs.getString("password");
+                        // This method checks the username and password against the 'users' table.
+                        return storedPassword.equals(password); 
+                    }
+                }
+            } catch (SQLException e) {
+                 // Removed JOptionPane here to avoid repeated errors. Handled in the UI method.
+                 // e.printStackTrace(); // Optional: print error to console
+            }
+            return false;
+        }
+
+        public boolean registerUser(String username, String password) {
+            String checkSql = "SELECT COUNT(*) FROM users WHERE username = ?";
+            String insertSql = "INSERT INTO users (username, password) VALUES (?, ?)";
+            
+            try (Connection conn = getConnection()) {
+                
+                try (PreparedStatement checkStmt = conn.prepareStatement(checkSql)) {
+                    checkStmt.setString(1, username);
+                    try (ResultSet rs = checkStmt.executeQuery()) {
+                        if (rs.next() && rs.getInt(1) > 0) {
+                            JOptionPane.showMessageDialog(null, "Username already exists. Choose a different one.", "Registration Failed", JOptionPane.WARNING_MESSAGE);
+                            return false; 
+                        }
+                    }
+                }
+                
+                try (PreparedStatement insertStmt = conn.prepareStatement(insertSql)) {
+                    insertStmt.setString(1, username);
+                    insertStmt.setString(2, password); 
+                    // This method registers a new user by inserting their details into the 'users' table.
+                    insertStmt.executeUpdate(); 
+                    return true;
+                }
+            } catch (SQLException e) {
+                 JOptionPane.showMessageDialog(null, "Database error during registration: " + e.getMessage(), "DB Error", JOptionPane.ERROR_MESSAGE);
+                 return false;
+            }
+        }
     }
-    SwingUtilities.invokeLater(LoginRegisterFrame::new);
+    
+    // --- Main Method ---
+    public static void main(String[] args) {
+        String os = System.getProperty("os.name").toLowerCase();
+        if (os.contains("win")) {
+            System.setProperty("sun.java2d.d3d", "true"); 
+        } else {
+            System.setProperty("sun.java2d.opengl", "true"); 
+        }
+        SwingUtilities.invokeLater(LoginRegisterFrame::new);
     }
 
-    
-    
-   
     
     
     // Color constants
-    private final Color PRIMARY_COLOR = new Color(255, 215, 0); // Gold
-    private final Color BACKGROUND_BLACK = Color.BLACK; // Background
-    private final Color FIELD_BACKGROUND = new Color(25, 25, 25); // Input fields
-    private final Color FOREGROUND_LIGHT = new Color(240, 240, 240); // Text
-    private final Color ACTION_COLOR = new Color(255, 165, 0); // Buttons / clickable labels
+    private final Color PRIMARY_COLOR = new Color(255, 215, 0); 
+    private final Color BACKGROUND_BLACK = Color.BLACK; 
+    private final Color FIELD_BACKGROUND = new Color(25, 25, 25); 
+    private final Color FOREGROUND_LIGHT = new Color(240, 240, 240); 
+    private final Color ACTION_COLOR = new Color(255, 165, 0); 
     
     
     
-  
-
     // Card layout for switching between login/register
     private JPanel cards;
     private CardLayout cl;
@@ -49,7 +112,6 @@ public class LoginRegisterFrame extends JFrame {
     
     
     
-
     // Login input fields
     private JTextField loginUsernameField;
     private JPasswordField loginPasswordField;
@@ -66,46 +128,8 @@ public class LoginRegisterFrame extends JFrame {
     
     
     
-
-    // Mock user database
-    private final Map<String, String> MOCK_USERS = new HashMap<>();
-    
-    
-    
-    
-
-    // Mock authentication manager
-    private class MockAuthManager {
-        public MockAuthManager() {
-            MOCK_USERS.put("testuser", "password123"); // Predefined users
-            MOCK_USERS.put("demo", "demo");
-        }
-
-        
-        
-        // Validate login
-        public boolean authenticateUser(String username, String password) {
-            return MOCK_USERS.containsKey(username) && MOCK_USERS.get(username).equals(password);
-        }
-        
-        
-
-        // Register new user
-        public boolean registerUser(String username, String password) {
-            if (MOCK_USERS.containsKey(username)) {
-                JOptionPane.showMessageDialog(LoginRegisterFrame.this,
-                        "Username already exists. Choose a different one.",
-                        "Registration Failed", JOptionPane.WARNING_MESSAGE);
-                return false;
-            }
-            MOCK_USERS.put(username, password); // Add to mock DB
-            return true;
-        }
-    }
-
-    
-    
-    private final MockAuthManager authManager = new MockAuthManager(); // Instance
+    // Instance of the database manager
+    private final DBManager authManager = new DBManager(); 
 
     
     
@@ -125,13 +149,13 @@ public class LoginRegisterFrame extends JFrame {
         UIManager.put("control", BACKGROUND_BLACK);
         UIManager.put("info", PRIMARY_COLOR);
 
-        setTitle("User Authentication"); // Window title
+        setTitle("User Authentication"); 
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        setSize(900,600); // Window size
-        setLocationRelativeTo(null); // Center on screen
-        getContentPane().setBackground(BACKGROUND_BLACK); // Background color
+        setSize(900,600); 
+        setLocationRelativeTo(null); 
+        getContentPane().setBackground(BACKGROUND_BLACK); 
 
-        cl = new CardLayout(); // Card layout for switching panels
+        cl = new CardLayout(); 
         cards = new JPanel(cl);
         cards.setOpaque(false);
 
@@ -149,13 +173,13 @@ public class LoginRegisterFrame extends JFrame {
         outerPanel.add(cards);
         add(outerPanel);
 
-        cl.show(cards, "LOGIN"); // Show login first
-        setVisible(true); // Display frame
+        cl.show(cards, "LOGIN"); 
+        setVisible(true); 
     }
 
     // Create login panel
     private JPanel createLoginPanel() {
-        JPanel panel = createStyledContentPanel("RAILWAY LOGIN"); // Styled panel with title
+        JPanel panel = createStyledContentPanel("RAILWAY LOGIN"); 
 
         // Input fields
         loginUsernameField = createStyledTextField(null, false);
@@ -170,7 +194,7 @@ public class LoginRegisterFrame extends JFrame {
 
         // Add input blocks
         inputContainerPanel.add(createInputBlock(createStyledLabel("USERNAME:"), loginUsernameField));
-        inputContainerPanel.add(Box.createVerticalStrut(25)); // Space
+        inputContainerPanel.add(Box.createVerticalStrut(25)); 
         inputContainerPanel.add(createInputBlock(createStyledLabel("PASSWORD:"), loginPasswordField));
         inputContainerPanel.add(Box.createVerticalStrut(40));
 
@@ -197,7 +221,7 @@ public class LoginRegisterFrame extends JFrame {
 
     // Create register panel
     private JPanel createRegisterPanel() {
-        JPanel panel = createStyledContentPanel("NEW USER SIGN UP"); // Styled title panel
+        JPanel panel = createStyledContentPanel("NEW USER SIGN UP"); 
 
         // Input fields
         registerUsernameField = createStyledTextField(null, false);
@@ -247,10 +271,10 @@ public class LoginRegisterFrame extends JFrame {
             protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setColor(BACKGROUND_BLACK.darker().darker()); // Background color
-                int arc = 40; // Rounded corners
+                g2.setColor(BACKGROUND_BLACK.darker().darker()); 
+                int arc = 40; 
                 g2.fillRoundRect(0, 0, getWidth(), getHeight(), arc, arc);
-                g2.setColor(PRIMARY_COLOR.darker()); // Border color
+                g2.setColor(PRIMARY_COLOR.darker()); 
                 g2.setStroke(new BasicStroke(2));
                 g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, arc, arc);
                 g2.dispose();
@@ -278,7 +302,7 @@ public class LoginRegisterFrame extends JFrame {
         label.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) {
-                cl.show(cards, targetCard); // Switch card
+                cl.show(cards, targetCard); 
                 // Clear all fields when switching
                 loginUsernameField.setText("");
                 loginPasswordField.setText("");
@@ -302,10 +326,23 @@ public class LoginRegisterFrame extends JFrame {
 
         if (authManager.authenticateUser(username, password)) {
             JOptionPane.showMessageDialog(this, "Login Successful! Welcome, " + username + ".", "Success", JOptionPane.INFORMATION_MESSAGE);
-            this.dispose(); // Close login frame
-            new SearchTrainFrame().setVisible(true); // Open next frame
+            
+            // --- FIX 1: Open SearchTrainFrame and add exception handling ---
+            try {
+                // Ensure the SearchTrainFrame class is in your project and compiled
+                new SearchTrainFrame().setVisible(true); 
+                this.dispose(); // Close the current frame
+            } catch (Exception ex) {
+                // If the SearchTrainFrame fails (e.g., a DB connection issue in its constructor)
+                ex.printStackTrace(); // Print the detailed error to your console
+                JOptionPane.showMessageDialog(this, 
+                    "Error opening Search Frame. Check the console and ensure SearchTrainFrame's DBManager has the correct password.", 
+                    "Fatal UI Error", JOptionPane.ERROR_MESSAGE);
+            }
+            // --- END FIX 1 ---
         } else {
-            JOptionPane.showMessageDialog(this, "Login Failed: Invalid username or password.\n\nTry: 'demo' / 'demo'", "Error", JOptionPane.ERROR_MESSAGE);
+            // Note: The mock demo credentials are now only valid if they are first registered in the DB.
+            JOptionPane.showMessageDialog(this, "Login Failed: Invalid username or password.", "Error", JOptionPane.ERROR_MESSAGE);
         }
     }
 
@@ -331,7 +368,8 @@ public class LoginRegisterFrame extends JFrame {
             registerUsernameField.setText("");
             registerPasswordField.setText("");
             registerConfirmPasswordField.setText("");
-            cl.show(cards, "LOGIN"); // Switch to login
+            cl.show(cards, "LOGIN"); 
+            // The application expects the user to manually click LOGIN after this success.
         }
     }
 
@@ -343,7 +381,7 @@ public class LoginRegisterFrame extends JFrame {
 
         label.setAlignmentX(Component.CENTER_ALIGNMENT);
         wrapper.add(label);
-        wrapper.add(Box.createVerticalStrut(5)); // Space
+        wrapper.add(Box.createVerticalStrut(5)); 
 
         field.setMaximumSize(new Dimension(400, field.getPreferredSize().height + 15));
         field.setAlignmentX(Component.CENTER_ALIGNMENT);

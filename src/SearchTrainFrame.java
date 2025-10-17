@@ -8,29 +8,16 @@ import java.time.LocalDate;
 import java.util.Vector;
 import javax.swing.border.TitledBorder;
 import javax.swing.border.Border;
+// JDBC Imports
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 
 public class SearchTrainFrame extends JFrame {
 
-    //Use D3D (directX 3D on windows and opengl on unix based system
-    public static void main(String[] args) {
-        String os = System.getProperty("os.name").toLowerCase();
-        if (os.contains("win")) {
-            System.setProperty("sun.java2d.d3d", "true"); // Windows
-        } else {
-            System.setProperty("sun.java2d.opengl", "true"); // Linux/macOS
-        }
-        SwingUtilities.invokeLater(LoginRegisterFrame::new);
-    }
-
-    private final Color PRIMARY_COLOR = new Color(255, 215, 0);
-    private final Color BACKGROUND_BLACK = Color.BLACK;
-    private final Color FIELD_BACKGROUND = new Color(25, 25, 25);
-    private final Color FOREGROUND_LIGHT = new Color(240, 240, 240);
-    private final Color ACTION_COLOR = new Color(255, 165, 0);
-    private final int RADIUS = 8;
-
-    private JList<String> resultList;
-
+    // --- CRITICAL FIX 1: TrainDetails Class Definition (Define it ONCE here) ---
+    // It is public so other files (like BookingFrame) can see it.
     public static class TrainDetails {
         public String id;
         public String name;
@@ -51,23 +38,94 @@ public class SearchTrainFrame extends JFrame {
             return id + " | " + name + " (10:00) | AC:" + basePriceAC + " | SL:" + basePriceSleeper;
         }
     }
+    // --- End TrainDetails Class ---
 
-    private static final Vector<TrainDetails> MOCK_TRAINS = new Vector<>();
-    static {
-        MOCK_TRAINS.add(new TrainDetails("12051", "Janshatabdi Express", 1200, 500, 1800));
-        MOCK_TRAINS.add(new TrainDetails("16346", "Netravati Express", 900, 350, 1500));
-        MOCK_TRAINS.add(new TrainDetails("22114", "Duronto Express", 1500, 650, 2500));
+    // --- DBManager Class (Connection Fix) ---
+    public static class DBManager {
+
+        private static final String DB_URL = "jdbc:mysql://localhost:3306/railway_db";
+        private static final String USER = "root";
+        private static final String PASS = "root";
+
+        public Connection getConnection() throws SQLException {
+            // FIX: Added Class.forName for robust driver loading
+            try {
+                Class.forName("com.mysql.cj.jdbc.Driver");
+            } catch (ClassNotFoundException e) {
+                throw new SQLException("MySQL JDBC Driver not found: " + e.getMessage());
+            }
+            return java.sql.DriverManager.getConnection(DB_URL, USER, PASS);
+        }
+
+        public Vector<String> loadStations() {
+            Vector<String> stations = new Vector<>();
+            stations.add("Select Station");
+            String sql = "SELECT name FROM stations ORDER BY name";
+            try (Connection conn = getConnection();
+                 PreparedStatement pstmt = conn.prepareStatement(sql);
+                 ResultSet rs = pstmt.executeQuery()) {
+
+                while (rs.next()) {
+                    stations.add(rs.getString("name"));
+                }
+            } catch (SQLException e) {
+                JOptionPane.showMessageDialog(null, "Database error loading stations: " + e.getMessage(), "DB Error", JOptionPane.ERROR_MESSAGE);
+            }
+            return stations;
+        }
+
+        public Vector<TrainDetails> searchTrains(String fromStation, String toStation) {
+            Vector<TrainDetails> trains = new Vector<>();
+
+            // NOTE: This simple query returns ALL trains, as designed for mock data.
+            String sql = "SELECT id, name, price_ac, price_sleeper, price_business FROM trains";
+
+            try (Connection conn = getConnection();
+                 PreparedStatement pstmt = conn.prepareStatement(sql);
+                 ResultSet rs = pstmt.executeQuery()) {
+
+                while (rs.next()) {
+                    String id = rs.getString("id");
+                    String name = rs.getString("name");
+                    int priceAC = rs.getInt("price_ac");
+                    int priceSleeper = rs.getInt("price_sleeper");
+                    int priceBusiness = rs.getInt("price_business");
+                    trains.add(new TrainDetails(id, name, priceAC, priceSleeper, priceBusiness));
+                }
+            } catch (SQLException e) {
+                JOptionPane.showMessageDialog(null, "Database error during train search: " + e.getMessage(), "DB Error", JOptionPane.ERROR_MESSAGE);
+            }
+            return trains;
+        }
+    }
+    // End of DBManager
+
+    //Use D3D (directX 3D on windows and opengl on unix based system
+    public static void main(String[] args) {
+        String os = System.getProperty("os.name").toLowerCase();
+        if (os.contains("win")) {
+            System.setProperty("sun.java2d.d3d", "true");
+        } else {
+            System.setProperty("sun.java2d.opengl", "true");
+        }
+        SwingUtilities.invokeLater(SearchTrainFrame::new);
     }
 
-    private Vector<String> loadStations() {
-        Vector<String> stations = new Vector<>();
-        stations.add("Select Station");
-        stations.add("Mumbai CSMT");
-        stations.add("New Delhi");
-        stations.add("Kollam Jn");
-        return stations;
-    }
+    private final Color PRIMARY_COLOR = new Color(255, 215, 0);
+    private final Color BACKGROUND_BLACK = Color.BLACK;
+    private final Color FIELD_BACKGROUND = new Color(25, 25, 25);
+    private final Color FOREGROUND_LIGHT = new Color(240, 240, 240);
+    private final Color ACTION_COLOR = new Color(255, 165, 0);
+    private final int RADIUS = 8;
 
+    private JList<String> resultList;
+
+    // Database Manager Instance
+    private final DBManager dbManager = new DBManager();
+    // Storage for the last search results
+    private Vector<TrainDetails> currentTrainResults = new Vector<>();
+
+    // --- Utility Method ---
     private Vector<String> getTrainDisplayList(Vector<TrainDetails> trains) {
         Vector<String> display = new Vector<>();
         for (TrainDetails train : trains) {
@@ -75,7 +133,9 @@ public class SearchTrainFrame extends JFrame {
         }
         return display;
     }
+    // --- End Utility Method ---
 
+    // --- Constructor ---
     public SearchTrainFrame() {
         try {
             UIManager.setLookAndFeel("javax.swing.plaf.nimbus.NimbusLookAndFeel");
@@ -116,14 +176,15 @@ public class SearchTrainFrame extends JFrame {
         JPanel searchPanel = new JPanel(new GridLayout(4, 2, 10, 15));
         searchPanel.setBackground(BACKGROUND_BLACK);
 
-        Vector<String> stationList = loadStations();
+        Vector<String> stationList = dbManager.loadStations(); // Load stations from DB
 
         JComboBox<String> fromBox = new JComboBox<>(stationList);
         styleComboBox(fromBox);
         JComboBox<String> toBox = new JComboBox<>(stationList);
         styleComboBox(toBox);
 
-        JTextField dateField = createStyledTextField(LocalDate.now().toString(), false);
+        // Note: The date is currently fixed to today's date and not used in the search query.
+        JTextField dateField = createStyledTextField(LocalDate.now().toString(), true); // Made readOnly true
 
         JButton searchBtn = createStyledButton("Search 🔍", PRIMARY_COLOR, Color.BLACK);
 
@@ -153,11 +214,16 @@ public class SearchTrainFrame extends JFrame {
             String from = (String) fromBox.getSelectedItem();
             String to = (String) toBox.getSelectedItem();
 
-            if ("Select Station".equals(from) || "Select Station".equals(to)) {
-                JOptionPane.showMessageDialog(this, "Please select valid 'From' and 'To' stations.", "Selection Error", JOptionPane.WARNING_MESSAGE);
+            if ("Select Station".equals(from) || "Select Station".equals(to) || from.equals(to)) {
+                JOptionPane.showMessageDialog(this, "Please select two different valid 'From' and 'To' stations.", "Selection Error", JOptionPane.WARNING_MESSAGE);
+                currentTrainResults = new Vector<>();
                 resultList.setListData(new Vector<>());
             } else {
-                resultList.setListData(getTrainDisplayList(MOCK_TRAINS));
+                currentTrainResults = dbManager.searchTrains(from, to);
+                if (currentTrainResults.isEmpty()) {
+                    JOptionPane.showMessageDialog(this, "No trains found for this route.", "No Results", JOptionPane.INFORMATION_MESSAGE);
+                }
+                resultList.setListData(getTrainDisplayList(currentTrainResults));
             }
         });
 
@@ -171,16 +237,29 @@ public class SearchTrainFrame extends JFrame {
         bookButtonPanel.setBackground(BACKGROUND_BLACK);
         bookButtonPanel.add(bookBtn);
 
+        // --- Book Button Action Listener ---
         bookBtn.addActionListener(e -> {
             int selectedIndex = resultList.getSelectedIndex();
-            if (selectedIndex != -1) {
-                TrainDetails selectedTrain = MOCK_TRAINS.get(selectedIndex);
-                this.dispose();
-                new BookingFrame(selectedTrain).setVisible(true);
+            if (selectedIndex != -1 && selectedIndex < currentTrainResults.size()) {
+                TrainDetails selectedTrain = currentTrainResults.get(selectedIndex);
+
+                // CRITICAL FIX: Instantiate and show the BookingFrame,
+                // passing the selected train's data.
+                try {
+                    new BookingFrame(selectedTrain).setVisible(true);
+                    this.dispose(); // Close the current frame
+                } catch (Exception ex) {
+                    ex.printStackTrace();
+                    JOptionPane.showMessageDialog(this,
+                        "Error launching Booking Frame: " + ex.getMessage(),
+                        "Fatal UI Error", JOptionPane.ERROR_MESSAGE);
+                }
+
             } else {
                 JOptionPane.showMessageDialog(this, "Please select a train from the list to book.", "No Train Selected", JOptionPane.WARNING_MESSAGE);
             }
         });
+        // --- END Book Button Action Listener ---
 
         mainContentPanel.add(centerPanel, BorderLayout.CENTER);
         mainContentPanel.add(bookButtonPanel, BorderLayout.SOUTH);
@@ -189,6 +268,7 @@ public class SearchTrainFrame extends JFrame {
         setVisible(true);
     }
 
+    // --- UI Helper Methods ---
     private JLabel createStyledLabel(String text) {
         JLabel label = new JLabel(text);
         label.setFont(new Font("Arial", Font.BOLD, 18));
