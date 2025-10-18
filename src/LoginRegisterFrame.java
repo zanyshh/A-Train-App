@@ -85,13 +85,20 @@ public class LoginRegisterFrame extends JFrame {
     
     // --- Main Method ---
     public static void main(String[] args) {
+        
+        //Performance Critical Components
         String os = System.getProperty("os.name").toLowerCase();
         if (os.contains("win")) {
-            System.setProperty("sun.java2d.d3d", "true"); 
+            System.setProperty("sun.java2d.d3d", "true");  // for d3d usage
         } else {
-            System.setProperty("sun.java2d.opengl", "true"); 
+            System.setProperty("sun.java2d.opengl", "true"); // for openGL usage
         }
         SwingUtilities.invokeLater(LoginRegisterFrame::new);
+       // System.setProperty("sun.java2d.trace", "timestamp"); // for debugging only system tracing
+        System.setProperty("sun.java2d.ddforcevram", "true"); // force VRAM usage
+        System.setProperty("sun.java2d.noddraw", "false");   // ensure DDraw not disabled
+        System.setProperty("sun.java2d.opengl.fbobject", "true"); // better OpenGL FBO
+
     }
 
     
@@ -179,12 +186,12 @@ public class LoginRegisterFrame extends JFrame {
 
     // Create login panel
     private JPanel createLoginPanel() {
-        JPanel panel = createStyledContentPanel("RAILWAY LOGIN"); 
+        JPanel panel = createStyledContentPanel("⛓ Railway Login"); 
 
         // Input fields
-        loginUsernameField = createStyledTextField(null, false);
-        loginPasswordField = createStyledPasswordField();
-        JButton loginButton = createStyledButton("LOGIN", PRIMARY_COLOR, Color.BLACK);
+        loginUsernameField = createRoundedTextField(null, false);
+        loginPasswordField = createRoundedPasswordField();
+        JButton loginButton = createStyledButton("LOGIN ➜", PRIMARY_COLOR, Color.BLACK);
 
         // Container for inputs
         JPanel inputContainerPanel = new JPanel();
@@ -193,9 +200,9 @@ public class LoginRegisterFrame extends JFrame {
         inputContainerPanel.setBorder(new EmptyBorder(50, 0, 50, 0));
 
         // Add input blocks
-        inputContainerPanel.add(createInputBlock(createStyledLabel("USERNAME:"), loginUsernameField));
+        inputContainerPanel.add(createInputBlock(createStyledLabel("Username"), loginUsernameField));
         inputContainerPanel.add(Box.createVerticalStrut(25)); 
-        inputContainerPanel.add(createInputBlock(createStyledLabel("PASSWORD:"), loginPasswordField));
+        inputContainerPanel.add(createInputBlock(createStyledLabel("Password"), loginPasswordField));
         inputContainerPanel.add(Box.createVerticalStrut(40));
 
         // Add login button
@@ -221,13 +228,13 @@ public class LoginRegisterFrame extends JFrame {
 
     // Create register panel
     private JPanel createRegisterPanel() {
-        JPanel panel = createStyledContentPanel("NEW USER SIGN UP"); 
+        JPanel panel = createStyledContentPanel("NEW USER? SIGN UP!"); 
 
         // Input fields
-        registerUsernameField = createStyledTextField(null, false);
-        registerPasswordField = createStyledPasswordField();
-        registerConfirmPasswordField = createStyledPasswordField();
-        JButton registerButton = createStyledButton("REGISTER", ACTION_COLOR, Color.BLACK);
+        registerUsernameField = createRoundedTextField(null, false);
+        registerPasswordField = createRoundedPasswordField();
+        registerConfirmPasswordField = createRoundedPasswordField();
+        JButton registerButton = createStyledButton("REGISTER ➜", ACTION_COLOR, Color.BLACK);
 
         // Container for inputs
         JPanel inputContainerPanel = new JPanel();
@@ -236,11 +243,11 @@ public class LoginRegisterFrame extends JFrame {
         inputContainerPanel.setBorder(new EmptyBorder(50, 0, 30, 0));
 
         // Add input blocks
-        inputContainerPanel.add(createInputBlock(createStyledLabel("USERNAME:"), registerUsernameField));
+        inputContainerPanel.add(createInputBlock(createStyledLabel("Username:"), registerUsernameField));
         inputContainerPanel.add(Box.createVerticalStrut(25));
-        inputContainerPanel.add(createInputBlock(createStyledLabel("PASSWORD:"), registerPasswordField));
+        inputContainerPanel.add(createInputBlock(createStyledLabel("Password:"), registerPasswordField));
         inputContainerPanel.add(Box.createVerticalStrut(25));
-        inputContainerPanel.add(createInputBlock(createStyledLabel("CONFIRM PASSWORD:"), registerConfirmPasswordField));
+        inputContainerPanel.add(createInputBlock(createStyledLabel("Confirm Password:"), registerConfirmPasswordField));
         inputContainerPanel.add(Box.createVerticalStrut(40));
 
         // Add register button
@@ -287,7 +294,7 @@ public class LoginRegisterFrame extends JFrame {
 
         // Title label
         JLabel titleLabel = new JLabel(titleText, SwingConstants.CENTER);
-        titleLabel.setFont(new Font("Arial", Font.BOLD, 48));
+        titleLabel.setFont(new Font("Segoe UI Emoji", Font.BOLD, 48));
         titleLabel.setForeground(PRIMARY_COLOR);
         panel.add(titleLabel, BorderLayout.NORTH);
         return panel;
@@ -297,7 +304,7 @@ public class LoginRegisterFrame extends JFrame {
     private JLabel createSwitchLabel(String text, String targetCard) {
         JLabel label = new JLabel(text);
         label.setForeground(ACTION_COLOR.brighter());
-        label.setFont(new Font("Arial", Font.PLAIN, 16));
+        label.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 16));
         label.setCursor(new Cursor(Cursor.HAND_CURSOR));
         label.addMouseListener(new MouseAdapter() {
             @Override
@@ -320,7 +327,7 @@ public class LoginRegisterFrame extends JFrame {
         String password = new String(loginPasswordField.getPassword());
 
         if (username.isEmpty() || password.isEmpty()) {
-            JOptionPane.showMessageDialog(this, "Please enter both username and password.", "Input Required", JOptionPane.WARNING_MESSAGE);
+            JOptionPane.showMessageDialog(this, "Please enter both Username and Password.", "Input Required", JOptionPane.WARNING_MESSAGE);
             return;
         }
 
@@ -393,86 +400,78 @@ public class LoginRegisterFrame extends JFrame {
     // Create styled label
     private JLabel createStyledLabel(String text) {
         JLabel label = new JLabel(text);
-        label.setFont(new Font("Arial", Font.BOLD, 18));
+        label.setFont(new Font("Segoe UI Emoji", Font.BOLD, 18));
         label.setForeground(FOREGROUND_LIGHT);
         return label;
     }
 
-    // Create styled text field
-    private JTextField createStyledTextField(String initialText, boolean readOnly) {
-        JTextField field = new JTextField(initialText);
-        field.setFont(new Font("Arial", Font.PLAIN, 18));
+    // Rounded text field
+    private JTextField createRoundedTextField(String initialText, boolean readOnly) {
+        JTextField field = new JTextField(initialText) {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(getBackground());
+                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 18, 18);
+                super.paintComponent(g);
+                g2.dispose();
+            }
+
+            @Override
+            protected void paintBorder(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(new Color(40, 40, 40));
+                g2.setStroke(new BasicStroke(2));
+                g2.drawRoundRect(0, 0, getWidth()-1, getHeight()-1, 18, 18);
+                g2.dispose();
+            }
+        };
+        field.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 18));
         field.setBackground(FIELD_BACKGROUND);
         field.setForeground(readOnly ? PRIMARY_COLOR.darker() : PRIMARY_COLOR);
         field.setCaretColor(PRIMARY_COLOR);
+        field.setBorder(BorderFactory.createEmptyBorder(8, 10, 8, 10));
         field.setEditable(!readOnly);
-
-        Border baseBorder = BorderFactory.createCompoundBorder(
-                new MatteBorder(0, 0, 2, 0, new Color(40, 40, 40)),
-                new EmptyBorder(8, 5, 8, 5)
-        );
-        field.setBorder(baseBorder);
-
-        // Highlight border on focus
-        if (!readOnly) {
-            field.addFocusListener(new java.awt.event.FocusAdapter() {
-                private final Border focusBaseBorder = field.getBorder();
-
-                @Override
-                public void focusGained(java.awt.event.FocusEvent e) {
-                    field.setBorder(BorderFactory.createCompoundBorder(
-                            new MatteBorder(0, 0, 2, 0, ACTION_COLOR),
-                            new EmptyBorder(8, 5, 8, 5)
-                    ));
-                }
-
-                @Override
-                public void focusLost(java.awt.event.FocusEvent e) {
-                    field.setBorder(focusBaseBorder);
-                }
-            });
-        }
         return field;
     }
 
-    // Create styled password field
-    private JPasswordField createStyledPasswordField() {
-        JPasswordField field = new JPasswordField();
-        field.setFont(new Font("Arial", Font.PLAIN, 18));
+    // Rounded password field
+    private JPasswordField createRoundedPasswordField() {
+        JPasswordField field = new JPasswordField() {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(getBackground());
+                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 18, 18);
+                super.paintComponent(g);
+                g2.dispose();
+            }
+
+            @Override
+            protected void paintBorder(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(new Color(40, 40, 40));
+                g2.setStroke(new BasicStroke(2));
+                g2.drawRoundRect(0, 0, getWidth()-1, getHeight()-1, 18, 18);
+                g2.dispose();
+            }
+        };
+        field.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 18));
         field.setBackground(FIELD_BACKGROUND);
         field.setForeground(PRIMARY_COLOR);
         field.setCaretColor(PRIMARY_COLOR);
-
-        Border baseBorder = BorderFactory.createCompoundBorder(
-                new MatteBorder(0, 0, 2, 0, new Color(40, 40, 40)),
-                new EmptyBorder(8, 5, 8, 5)
-        );
-        field.setBorder(baseBorder);
-
-        // Highlight border on focus
-        field.addFocusListener(new java.awt.event.FocusAdapter() {
-            private final Border focusBaseBorder = field.getBorder();
-
-            @Override
-            public void focusGained(java.awt.event.FocusEvent e) {
-                field.setBorder(BorderFactory.createCompoundBorder(
-                        new MatteBorder(0, 0, 2, 0, ACTION_COLOR),
-                        new EmptyBorder(8, 5, 8, 5)
-                ));
-            }
-
-            @Override
-            public void focusLost(java.awt.event.FocusEvent e) {
-                field.setBorder(baseBorder);
-            }
-        });
+        field.setBorder(BorderFactory.createEmptyBorder(8, 10, 8, 10));
         return field;
     }
 
     // Create styled button with hover effect
     private JButton createStyledButton(String text, Color background, Color foreground) {
         JButton button = new JButton(text);
-        button.setFont(new Font("Arial", Font.BOLD, 18));
+        button.setFont(new Font("Segoe UI Emoji", Font.BOLD, 18));
         button.setBackground(background);
         button.setForeground(foreground);
         button.setFocusPainted(false);
