@@ -100,23 +100,28 @@ public class SearchTrainFrame extends JFrame {
     }
     // End of DBManager
 
-    //Use D3D (directX 3D on windows and opengl on unix based system
+    
     public static void main(String[] args) {
+        // Performance Critical Components
         String os = System.getProperty("os.name").toLowerCase();
         if (os.contains("win")) {
-            System.setProperty("sun.java2d.d3d", "true");
+            System.setProperty("sun.java2d.d3d", "true"); // for d3d usage
         } else {
-            System.setProperty("sun.java2d.opengl", "true");
+            System.setProperty("sun.java2d.opengl", "true"); // for OpenGl usage
         }
         SwingUtilities.invokeLater(SearchTrainFrame::new);
+         //  System.setProperty("sun.java2d.trace", "timestamp"); // for debugging only system tracing
+        System.setProperty("sun.java2d.ddforcevram", "true"); // force VRAM usage
+        System.setProperty("sun.java2d.noddraw", "false");   // ensure DDraw not disabled
+        System.setProperty("sun.java2d.opengl.fbobject", "true"); // better OpenGL FBO
     }
 
     private final Color PRIMARY_COLOR = new Color(255, 215, 0);
     private final Color BACKGROUND_BLACK = Color.BLACK;
     private final Color FIELD_BACKGROUND = new Color(25, 25, 25);
-    private final Color FOREGROUND_LIGHT = new Color(240, 240, 240);
+    private final Color FOREGROUND_LIGHT = new Color(200, 200, 200); // changed to light grey
     private final Color ACTION_COLOR = new Color(255, 165, 0);
-    private final int RADIUS = 8;
+    private final int RADIUS = 18; // corner rounding updated to 18px
 
     private JList<String> resultList;
 
@@ -141,6 +146,7 @@ public class SearchTrainFrame extends JFrame {
             UIManager.setLookAndFeel("javax.swing.plaf.nimbus.NimbusLookAndFeel");
         } catch (Exception e) {}
 
+        // UI Defaults
         UIManager.put("nimbusBase", new Color(10, 10, 10));
         UIManager.put("text", FOREGROUND_LIGHT);
         UIManager.put("control", BACKGROUND_BLACK);
@@ -150,7 +156,7 @@ public class SearchTrainFrame extends JFrame {
         UIManager.put("TextArea.foreground", FOREGROUND_LIGHT);
         UIManager.put("TitledBorder.titleColor", PRIMARY_COLOR);
         UIManager.put("ComboBox.background", FIELD_BACKGROUND);
-        UIManager.put("ComboBox.foreground", PRIMARY_COLOR);
+        UIManager.put("ComboBox.foreground", FOREGROUND_LIGHT);
         UIManager.put("ComboBox.selectionBackground", PRIMARY_COLOR);
         UIManager.put("ComboBox.selectionForeground", BACKGROUND_BLACK);
         UIManager.put("List.background", FIELD_BACKGROUND);
@@ -164,32 +170,34 @@ public class SearchTrainFrame extends JFrame {
         setLocationRelativeTo(null);
         getContentPane().setBackground(BACKGROUND_BLACK);
 
-        JPanel mainContentPanel = new JPanel(new BorderLayout(15, 15));
+        JPanel mainContentPanel = new JPanel(new BorderLayout(20, 20));
         mainContentPanel.setBackground(BACKGROUND_BLACK);
         mainContentPanel.setBorder(new EmptyBorder(20, 20, 20, 20));
 
-        JLabel titleLabel = new JLabel("FIND YOUR TRAIN", SwingConstants.CENTER);
-        titleLabel.setFont(new Font("Arial", Font.BOLD, 48));
+        JLabel titleLabel = new JLabel("🔍 ︎Find Your Train", SwingConstants.CENTER);
+        titleLabel.setFont(new Font("Segoe UI Emoji", Font.BOLD, 42));
         titleLabel.setForeground(PRIMARY_COLOR);
         mainContentPanel.add(titleLabel, BorderLayout.NORTH);
 
-        JPanel searchPanel = new JPanel(new GridLayout(4, 2, 10, 15));
+        JPanel searchPanel = new JPanel(new GridBagLayout());
         searchPanel.setBackground(BACKGROUND_BLACK);
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(12, 12, 12, 12);
+        gbc.fill = GridBagConstraints.HORIZONTAL;
 
         Vector<String> stationList = dbManager.loadStations(); // Load stations from DB
 
         JComboBox<String> fromBox = new JComboBox<>(stationList);
-        styleComboBox(fromBox);
         JComboBox<String> toBox = new JComboBox<>(stationList);
+        styleComboBox(fromBox);
         styleComboBox(toBox);
 
-        // Note: The date is currently fixed to today's date and not used in the search query.
-        JTextField dateField = createStyledTextField(LocalDate.now().toString(), true); // Made readOnly true
+        JTextField dateField = createStyledTextField(LocalDate.now().toString(), true);
 
-        JButton searchBtn = createStyledButton("Search 🔍", PRIMARY_COLOR, Color.BLACK);
+        JButton searchBtn = createStyledButton("Search 🔍︎", PRIMARY_COLOR, Color.BLACK);
 
         resultList = new JList<>();
-        resultList.setFont(new Font("Arial", Font.PLAIN, 18));
+        resultList.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 18));
         resultList.setBackground(FIELD_BACKGROUND);
         resultList.setForeground(FOREGROUND_LIGHT);
         resultList.setBorder(BorderFactory.createEmptyBorder());
@@ -200,15 +208,34 @@ public class SearchTrainFrame extends JFrame {
             BorderFactory.createLineBorder(PRIMARY_COLOR, 1, true),
             new EmptyBorder(5,5,5,5)
         ));
+        scrollPane.getViewport().setBackground(FIELD_BACKGROUND);
 
-        searchPanel.add(createStyledLabel("FROM STATION:"));
-        searchPanel.add(fromBox);
-        searchPanel.add(createStyledLabel("TO STATION:"));
-        searchPanel.add(toBox);
-        searchPanel.add(createStyledLabel("TRAVEL DATE:"));
-        searchPanel.add(dateField);
-        searchPanel.add(new JLabel(""));
-        searchPanel.add(searchBtn);
+        // Add FROM label and combo box
+        gbc.gridx = 0;
+        gbc.gridy = 0;
+        searchPanel.add(createStyledLabel("From Station:"), gbc);
+        gbc.gridx = 1;
+        searchPanel.add(fromBox, gbc);
+
+        // Add TO label and combo box
+        gbc.gridx = 0;
+        gbc.gridy = 1;
+        searchPanel.add(createStyledLabel("To Station"), gbc);
+        gbc.gridx = 1;
+        searchPanel.add(toBox, gbc);
+
+        // Add DATE label and field
+        gbc.gridx = 0;
+        gbc.gridy = 2;
+        searchPanel.add(createStyledLabel("Departure:"), gbc);
+        gbc.gridx = 1;
+        searchPanel.add(dateField, gbc);
+
+        // Add SEARCH button
+        gbc.gridx = 0;
+        gbc.gridy = 3;
+        gbc.gridwidth = 2;
+        searchPanel.add(searchBtn, gbc);
 
         searchBtn.addActionListener(e -> {
             String from = (String) fromBox.getSelectedItem();
@@ -227,7 +254,7 @@ public class SearchTrainFrame extends JFrame {
             }
         });
 
-        JPanel centerPanel = new JPanel(new BorderLayout(10, 10));
+        JPanel centerPanel = new JPanel(new BorderLayout(15, 15));
         centerPanel.setBackground(BACKGROUND_BLACK);
         centerPanel.add(searchPanel, BorderLayout.NORTH);
         centerPanel.add(scrollPane, BorderLayout.CENTER);
@@ -237,17 +264,14 @@ public class SearchTrainFrame extends JFrame {
         bookButtonPanel.setBackground(BACKGROUND_BLACK);
         bookButtonPanel.add(bookBtn);
 
-        // --- Book Button Action Listener ---
         bookBtn.addActionListener(e -> {
             int selectedIndex = resultList.getSelectedIndex();
             if (selectedIndex != -1 && selectedIndex < currentTrainResults.size()) {
                 TrainDetails selectedTrain = currentTrainResults.get(selectedIndex);
 
-                // CRITICAL FIX: Instantiate and show the BookingFrame,
-                // passing the selected train's data.
                 try {
                     new BookingFrame(selectedTrain).setVisible(true);
-                    this.dispose(); // Close the current frame
+                    this.dispose();
                 } catch (Exception ex) {
                     ex.printStackTrace();
                     JOptionPane.showMessageDialog(this,
@@ -259,7 +283,6 @@ public class SearchTrainFrame extends JFrame {
                 JOptionPane.showMessageDialog(this, "Please select a train from the list to book.", "No Train Selected", JOptionPane.WARNING_MESSAGE);
             }
         });
-        // --- END Book Button Action Listener ---
 
         mainContentPanel.add(centerPanel, BorderLayout.CENTER);
         mainContentPanel.add(bookButtonPanel, BorderLayout.SOUTH);
@@ -271,7 +294,7 @@ public class SearchTrainFrame extends JFrame {
     // --- UI Helper Methods ---
     private JLabel createStyledLabel(String text) {
         JLabel label = new JLabel(text);
-        label.setFont(new Font("Arial", Font.BOLD, 18));
+        label.setFont(new Font("Segoe UI Emoji", Font.BOLD, 18));
         label.setForeground(FOREGROUND_LIGHT);
         return label;
     }
@@ -288,7 +311,7 @@ public class SearchTrainFrame extends JFrame {
                 super.paintComponent(g);
             }
         };
-        field.setFont(new Font("Arial", Font.PLAIN, 18));
+        field.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 18));
         field.setBackground(FIELD_BACKGROUND);
         field.setForeground(readOnly ? PRIMARY_COLOR.darker() : PRIMARY_COLOR);
         field.setCaretColor(PRIMARY_COLOR);
@@ -299,9 +322,10 @@ public class SearchTrainFrame extends JFrame {
     }
 
     private void styleComboBox(JComboBox<String> box) {
-        box.setFont(new Font("Arial", Font.PLAIN, 18));
+        box.setFont(new Font("Segoe UI emoji", Font.PLAIN, 18));
         box.setBackground(FIELD_BACKGROUND);
-        box.setForeground(PRIMARY_COLOR);
+        box.setForeground(FOREGROUND_LIGHT);
+
         box.setUI(new javax.swing.plaf.basic.BasicComboBoxUI() {
             @Override
             protected JButton createArrowButton() {
@@ -312,7 +336,17 @@ public class SearchTrainFrame extends JFrame {
                 arrow.setForeground(PRIMARY_COLOR);
                 return arrow;
             }
+
+            @Override
+            public void paintCurrentValue(Graphics g, Rectangle bounds, boolean hasFocus) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setColor(FIELD_BACKGROUND);
+                g2.fillRoundRect(bounds.x, bounds.y, bounds.width, bounds.height, RADIUS, RADIUS);
+                super.paintCurrentValue(g, bounds, hasFocus);
+                g2.dispose();
+            }
         });
+
         box.setBorder(BorderFactory.createEmptyBorder(5, 10, 5, 10));
     }
 
@@ -328,7 +362,7 @@ public class SearchTrainFrame extends JFrame {
                 super.paintComponent(g);
             }
         };
-        button.setFont(new Font("Arial", Font.BOLD, 18));
+        button.setFont(new Font("Segoe UI emoji", Font.BOLD, 18));
         button.setBackground(background);
         button.setForeground(foreground);
         button.setFocusPainted(false);

@@ -69,9 +69,17 @@ public class BookingFrame extends JFrame {
     // End of DBManager
 
     public static void main(String[] args) {
+        
+        // Performance Critical Components
         String os = System.getProperty("os.name").toLowerCase();
         if (os.contains("win")) System.setProperty("sun.java2d.d3d", "true");
         else System.setProperty("sun.java2d.opengl", "true");
+        
+      //  System.setProperty("sun.java2d.trace", "timestamp"); // for debugging only system tracing
+        System.setProperty("sun.java2d.ddforcevram", "true"); // force VRAM usage
+        System.setProperty("sun.java2d.noddraw", "false");   // ensure DDraw not disabled
+        System.setProperty("sun.java2d.opengl.fbobject", "true"); // better OpenGL FBO
+
 
         // Mock train data for standalone testing
         // You MUST use SearchTrainFrame.TrainDetails here!
@@ -119,8 +127,8 @@ public class BookingFrame extends JFrame {
         mainPanel.setBackground(BACKGROUND_BLACK);
         mainPanel.setBorder(new EmptyBorder(10, 20, 10, 20));
 
-        JLabel titleLabel = new JLabel("TICKET BOOKING", SwingConstants.CENTER);
-        titleLabel.setFont(new Font("Arial", Font.BOLD, 36));
+        JLabel titleLabel = new JLabel("🎟️ Ticket Booking", SwingConstants.CENTER);
+        titleLabel.setFont(new Font("Segoe UI Emoji", Font.BOLD, 36));
         titleLabel.setForeground(PRIMARY_COLOR);
         mainPanel.add(titleLabel, BorderLayout.NORTH);
 
@@ -135,7 +143,7 @@ public class BookingFrame extends JFrame {
         JTextField ageField = createStyledTextField("", false);
         JComboBox<String> classBox = createStyledComboBox(new String[]{"AC", "Sleeper", "Business"});
         seatCountField = createStyledTextField("1", false);
-        JButton confirmBtn = createStyledButton("Confirm Booking", PRIMARY_COLOR, Color.BLACK);
+        JButton confirmBtn = createStyledButton("Confirm Booking ➜", PRIMARY_COLOR, Color.BLACK);
 
         gbc.gridx = 0; gbc.gridy = 0;
         formPanel.add(createStyledLabel("Train Name:"), gbc);
@@ -223,14 +231,14 @@ public class BookingFrame extends JFrame {
 
     private JLabel createStyledLabel(String text) {
         JLabel label = new JLabel(text);
-        label.setFont(new Font("Arial", Font.BOLD, 16));
+        label.setFont(new Font("Segoe UI Emoji", Font.BOLD, 16));
         label.setForeground(FOREGROUND_LIGHT);
         return label;
     }
 
     private JTextField createStyledTextField(String text, boolean readOnly) {
         JTextField field = new JTextField(text);
-        field.setFont(new Font("Arial", Font.PLAIN, 16));
+        field.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 16));
         field.setBackground(FIELD_BACKGROUND);
         field.setForeground(readOnly ? PRIMARY_COLOR.darker() : PRIMARY_COLOR);
         field.setCaretColor(PRIMARY_COLOR);
@@ -245,7 +253,7 @@ public class BookingFrame extends JFrame {
 
     private JComboBox<String> createStyledComboBox(String[] items) {
         JComboBox<String> box = new JComboBox<>(items);
-        box.setFont(new Font("Arial", Font.PLAIN, 16));
+        box.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 16));
         box.setBackground(FIELD_BACKGROUND);
         box.setForeground(PRIMARY_COLOR);
         box.setUI(new javax.swing.plaf.basic.BasicComboBoxUI() {
@@ -268,7 +276,7 @@ public class BookingFrame extends JFrame {
 
     private JButton createStyledButton(String text, Color bg, Color fg) {
         JButton btn = new JButton(text);
-        btn.setFont(new Font("Arial", Font.BOLD, 16));
+        btn.setFont(new Font("Segoe UI Emoji", Font.BOLD, 16));
         btn.setBackground(bg);
         btn.setForeground(fg);
         btn.setFocusPainted(false);
