@@ -9,9 +9,7 @@ import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.Random;
 
-// CRITICAL FIX 1: Import the TrainDetails class from SearchTrainFrame.java
-// If SearchTrainFrame is in the default package, no import statement is needed.
-// If it is in a package, you would need: import com.yourpackage.SearchTrainFrame.TrainDetails;
+
 
 
 public class BookingFrame extends JFrame {
@@ -41,7 +39,7 @@ public class BookingFrame extends JFrame {
 
                 pstmt.setString(1, trainId);
                 pstmt.setString(2, passengerName);
-                pstmt.setInt(3, age);
+                pstmt.setInt(3, age); 
                 pstmt.setString(4, travelClass);
                 pstmt.setInt(5, seats);
                 pstmt.setInt(6, totalAmount);
@@ -143,7 +141,7 @@ public class BookingFrame extends JFrame {
         JTextField ageField = createStyledTextField("", false);
         JComboBox<String> classBox = createStyledComboBox(new String[]{"AC", "Sleeper", "Business"});
         seatCountField = createStyledTextField("1", false);
-        JButton confirmBtn = createStyledButton("Confirm Booking ➜", PRIMARY_COLOR, Color.BLACK);
+        JButton confirmBtn = createStyledButton("Confirm Booking →", PRIMARY_COLOR, Color.BLACK);
 
         gbc.gridx = 0; gbc.gridy = 0;
         formPanel.add(createStyledLabel("Train Name:"), gbc);

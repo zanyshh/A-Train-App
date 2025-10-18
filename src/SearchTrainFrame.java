@@ -2,9 +2,14 @@ import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import javax.swing.border.MatteBorder;
 import java.awt.*;
+import static java.awt.Color.ORANGE;
+import static java.awt.Color.RED;
+import static java.awt.Color.WHITE;
+import static java.awt.Color.red;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.Vector;
 import javax.swing.border.TitledBorder;
 import javax.swing.border.Border;
@@ -16,8 +21,7 @@ import java.sql.SQLException;
 
 public class SearchTrainFrame extends JFrame {
 
-    // --- CRITICAL FIX 1: TrainDetails Class Definition (Define it ONCE here) ---
-    // It is public so other files (like BookingFrame) can see it.
+    
     public static class TrainDetails {
         public String id;
         public String name;
@@ -40,7 +44,7 @@ public class SearchTrainFrame extends JFrame {
     }
     // --- End TrainDetails Class ---
 
-    // --- DBManager Class (Connection Fix) ---
+    // --- DBManager Class (Connection Fix and Filter) ---
     public static class DBManager {
 
         private static final String DB_URL = "jdbc:mysql://localhost:3306/railway_db";
@@ -48,7 +52,7 @@ public class SearchTrainFrame extends JFrame {
         private static final String PASS = "root";
 
         public Connection getConnection() throws SQLException {
-            // FIX: Added Class.forName for robust driver loading
+            
             try {
                 Class.forName("com.mysql.cj.jdbc.Driver");
             } catch (ClassNotFoundException e) {
@@ -77,23 +81,30 @@ public class SearchTrainFrame extends JFrame {
         public Vector<TrainDetails> searchTrains(String fromStation, String toStation) {
             Vector<TrainDetails> trains = new Vector<>();
 
-            // NOTE: This simple query returns ALL trains, as designed for mock data.
-            String sql = "SELECT id, name, price_ac, price_sleeper, price_business FROM trains";
+            // Filtered SQL: Searches trains where the 'name' column contains the 'toStation' name.
+            String sql = "SELECT id, name, price_ac, price_sleeper, price_business " +
+                         "FROM trains " +
+                         "WHERE name LIKE ?";
 
             try (Connection conn = getConnection();
-                 PreparedStatement pstmt = conn.prepareStatement(sql);
-                 ResultSet rs = pstmt.executeQuery()) {
+                 PreparedStatement pstmt = conn.prepareStatement(sql)) {
+                
+                pstmt.setString(1, "%" + toStation + "%");
 
-                while (rs.next()) {
-                    String id = rs.getString("id");
-                    String name = rs.getString("name");
-                    int priceAC = rs.getInt("price_ac");
-                    int priceSleeper = rs.getInt("price_sleeper");
-                    int priceBusiness = rs.getInt("price_business");
-                    trains.add(new TrainDetails(id, name, priceAC, priceSleeper, priceBusiness));
+                try (ResultSet rs = pstmt.executeQuery()) {
+
+                    while (rs.next()) {
+                        String id = rs.getString("id");
+                        String name = rs.getString("name");
+                        int priceAC = rs.getInt("price_ac");
+                        int priceSleeper = rs.getInt("price_sleeper");
+                        int priceBusiness = rs.getInt("price_business");
+                        trains.add(new TrainDetails(id, name, priceAC, priceSleeper, priceBusiness));
+                    }
                 }
             } catch (SQLException e) {
                 JOptionPane.showMessageDialog(null, "Database error during train search: " + e.getMessage(), "DB Error", JOptionPane.ERROR_MESSAGE);
+                e.printStackTrace();
             }
             return trains;
         }
@@ -110,13 +121,13 @@ public class SearchTrainFrame extends JFrame {
             System.setProperty("sun.java2d.opengl", "true"); // for OpenGl usage
         }
         SwingUtilities.invokeLater(SearchTrainFrame::new);
-         //  System.setProperty("sun.java2d.trace", "timestamp"); // for debugging only system tracing
+          // System.setProperty("sun.java2d.trace", "timestamp"); // for debugging only system tracing
         System.setProperty("sun.java2d.ddforcevram", "true"); // force VRAM usage
-        System.setProperty("sun.java2d.noddraw", "false");   // ensure DDraw not disabled
+        System.setProperty("sun.java2d.noddraw", "false");    // ensure DDraw not disabled
         System.setProperty("sun.java2d.opengl.fbobject", "true"); // better OpenGL FBO
     }
 
-    private final Color PRIMARY_COLOR = new Color(255, 215, 0);
+    private final Color PRIMARY_COLOR = new Color(255, 215, 0); // Yellow/Gold
     private final Color BACKGROUND_BLACK = Color.BLACK;
     private final Color FIELD_BACKGROUND = new Color(25, 25, 25);
     private final Color FOREGROUND_LIGHT = new Color(200, 200, 200); // changed to light grey
@@ -129,6 +140,18 @@ public class SearchTrainFrame extends JFrame {
     private final DBManager dbManager = new DBManager();
     // Storage for the last search results
     private Vector<TrainDetails> currentTrainResults = new Vector<>();
+
+    // --- Utility Method to generate next 7 days ---
+    private Vector<String> getNextSevenDays() {
+        Vector<String> dates = new Vector<>();
+        LocalDate today = LocalDate.now();
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("EEE, dd MMM");
+        
+        for (int i = 0; i < 7; i++) {
+            dates.add(today.plusDays(i).format(formatter) + (i == 0 ? " (Today)" : ""));
+        }
+        return dates;
+    }
 
     // --- Utility Method ---
     private Vector<String> getTrainDisplayList(Vector<TrainDetails> trains) {
@@ -166,6 +189,7 @@ public class SearchTrainFrame extends JFrame {
 
         setTitle("Search Trains");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        // Original Size Maintained
         setSize(900,600);
         setLocationRelativeTo(null);
         getContentPane().setBackground(BACKGROUND_BLACK);
@@ -174,7 +198,7 @@ public class SearchTrainFrame extends JFrame {
         mainContentPanel.setBackground(BACKGROUND_BLACK);
         mainContentPanel.setBorder(new EmptyBorder(20, 20, 20, 20));
 
-        JLabel titleLabel = new JLabel("🔍 ︎Find Your Train", SwingConstants.CENTER);
+        JLabel titleLabel = new JLabel("Find Your Train", SwingConstants.CENTER);
         titleLabel.setFont(new Font("Segoe UI Emoji", Font.BOLD, 42));
         titleLabel.setForeground(PRIMARY_COLOR);
         mainContentPanel.add(titleLabel, BorderLayout.NORTH);
@@ -182,19 +206,22 @@ public class SearchTrainFrame extends JFrame {
         JPanel searchPanel = new JPanel(new GridBagLayout());
         searchPanel.setBackground(BACKGROUND_BLACK);
         GridBagConstraints gbc = new GridBagConstraints();
+        // Original Insets Maintained
         gbc.insets = new Insets(12, 12, 12, 12);
         gbc.fill = GridBagConstraints.HORIZONTAL;
 
         Vector<String> stationList = dbManager.loadStations(); // Load stations from DB
+        Vector<String> dateList = getNextSevenDays(); // Get dates for dropdown
 
         JComboBox<String> fromBox = new JComboBox<>(stationList);
         JComboBox<String> toBox = new JComboBox<>(stationList);
+        JComboBox<String> dateBox = new JComboBox<>(dateList); 
+        
         styleComboBox(fromBox);
         styleComboBox(toBox);
+        styleComboBox(dateBox); 
 
-        JTextField dateField = createStyledTextField(LocalDate.now().toString(), true);
-
-        JButton searchBtn = createStyledButton("Search 🔍︎", PRIMARY_COLOR, Color.BLACK);
+        JButton searchBtn = createStyledButton("Search →︎︎", PRIMARY_COLOR, Color.BLACK);
 
         resultList = new JList<>();
         resultList.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 18));
@@ -220,26 +247,44 @@ public class SearchTrainFrame extends JFrame {
         // Add TO label and combo box
         gbc.gridx = 0;
         gbc.gridy = 1;
-        searchPanel.add(createStyledLabel("To Station"), gbc);
+        searchPanel.add(createStyledLabel("To Station:"), gbc);
         gbc.gridx = 1;
         searchPanel.add(toBox, gbc);
 
-        // Add DATE label and field
+        // Add DATE label and combo box (Row 2)
         gbc.gridx = 0;
         gbc.gridy = 2;
-        searchPanel.add(createStyledLabel("Departure:"), gbc);
+        searchPanel.add(createStyledLabel("Journey Date:"), gbc);
         gbc.gridx = 1;
-        searchPanel.add(dateField, gbc);
+        searchPanel.add(dateBox, gbc);
 
-        // Add SEARCH button
+      
+        JLabel prebookingNote = new JLabel("               *Pre-booking is allowed only up to one week in advance.");
+        prebookingNote.setFont(new Font("Segoe UI Emoji", Font.BOLD, 12));
+        prebookingNote.setForeground(RED); // Use PRIMARY_COLOR (Yellow/Gold)
+        
+        // Reset insets for smaller text
+        gbc.insets = new Insets(0, 12, 12, 12); 
         gbc.gridx = 0;
         gbc.gridy = 3;
+        gbc.gridwidth = 2; // Span across both columns
+        gbc.anchor = GridBagConstraints.EAST; // Align text to the right side of the panel
+        searchPanel.add(prebookingNote, gbc);
+        
+        // Restore original insets for search button
+        gbc.insets = new Insets(12, 12, 12, 12);
+        
+        // Add SEARCH button (Row 4)
+        gbc.gridx = 0;
+        gbc.gridy = 4;
         gbc.gridwidth = 2;
+        gbc.anchor = GridBagConstraints.CENTER; // Center the button
         searchPanel.add(searchBtn, gbc);
 
         searchBtn.addActionListener(e -> {
             String from = (String) fromBox.getSelectedItem();
             String to = (String) toBox.getSelectedItem();
+            // String date = (String) dateBox.getSelectedItem(); // Date is selected but not currently used in searchTrains logic.
 
             if ("Select Station".equals(from) || "Select Station".equals(to) || from.equals(to)) {
                 JOptionPane.showMessageDialog(this, "Please select two different valid 'From' and 'To' stations.", "Selection Error", JOptionPane.WARNING_MESSAGE);
@@ -271,7 +316,8 @@ public class SearchTrainFrame extends JFrame {
 
                 try {
                     new BookingFrame(selectedTrain).setVisible(true);
-                    this.dispose();
+                    this.dispose(); // Close the SearchFrame
+
                 } catch (Exception ex) {
                     ex.printStackTrace();
                     JOptionPane.showMessageDialog(this,
@@ -299,6 +345,7 @@ public class SearchTrainFrame extends JFrame {
         return label;
     }
 
+    // Kept for consistency, although dateField logic is removed
     private JTextField createStyledTextField(String initialText, boolean readOnly) {
         JTextField field = new JTextField(initialText) {
             @Override
