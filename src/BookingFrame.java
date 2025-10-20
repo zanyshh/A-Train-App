@@ -3,16 +3,42 @@ import javax.swing.border.EmptyBorder;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
-// JDBC Imports
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.Random;
 
+class SearchTrainFrame {
+    static class TrainDetails {
+        String id;
+        String name;
+        int basePriceAC;
+        int basePriceSleeper;
+        int basePriceBusiness;
 
-
+        public TrainDetails(String id, String name, int basePriceAC, int basePriceSleeper, int basePriceBusiness) {
+            this.id = id;
+            this.name = name;
+            this.basePriceAC = basePriceAC;
+            this.basePriceSleeper = basePriceSleeper;
+            this.basePriceBusiness = basePriceBusiness;
+        }
+    }
+}
 
 public class BookingFrame extends JFrame {
+
+    private static final int TOTAL_AC = 250;
+    private static final int TOTAL_SLEEPER = 300;
+    private static final int TOTAL_BUSINESS = 30;
+
+    private static int availableACSeats = TOTAL_AC;
+    private static int availableSleeperSeats = TOTAL_SLEEPER;
+    private static int availableBusinessSeats = TOTAL_BUSINESS;
+
+    private JLabel acAvailableLabel;
+    private JLabel sleeperAvailableLabel;
+    private JLabel businessAvailableLabel;
 
     public static class DBManager {
 
@@ -21,7 +47,7 @@ public class BookingFrame extends JFrame {
         private static final String PASS = "root";
 
         public Connection getConnection() throws SQLException {
-            // FIX: Added Class.forName for robust driver loading
+            
             try {
                 Class.forName("com.mysql.cj.jdbc.Driver");
             } catch (ClassNotFoundException e) {
@@ -39,7 +65,7 @@ public class BookingFrame extends JFrame {
 
                 pstmt.setString(1, trainId);
                 pstmt.setString(2, passengerName);
-                pstmt.setInt(3, age); 
+                pstmt.setInt(3, age);
                 pstmt.setString(4, travelClass);
                 pstmt.setInt(5, seats);
                 pstmt.setInt(6, totalAmount);
@@ -54,7 +80,6 @@ public class BookingFrame extends JFrame {
         }
 
         private String generateBookingReference() {
-            // Simple 8-character reference code
             String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
             Random random = new Random();
             StringBuilder sb = new StringBuilder(8);
@@ -64,23 +89,18 @@ public class BookingFrame extends JFrame {
             return sb.toString();
         }
     }
-    // End of DBManager
 
     public static void main(String[] args) {
         
-        // Performance Critical Components
         String os = System.getProperty("os.name").toLowerCase();
         if (os.contains("win")) System.setProperty("sun.java2d.d3d", "true");
         else System.setProperty("sun.java2d.opengl", "true");
         
-      //  System.setProperty("sun.java2d.trace", "timestamp"); // for debugging only system tracing
-        System.setProperty("sun.java2d.ddforcevram", "true"); // force VRAM usage
-        System.setProperty("sun.java2d.noddraw", "false");   // ensure DDraw not disabled
-        System.setProperty("sun.java2d.opengl.fbobject", "true"); // better OpenGL FBO
+        System.setProperty("sun.java2d.ddforcevram", "true");
+        System.setProperty("sun.java2d.noddraw", "false");
+        System.setProperty("sun.java2d.opengl.fbobject", "true");
 
 
-        // Mock train data for standalone testing
-        // You MUST use SearchTrainFrame.TrainDetails here!
         SearchTrainFrame.TrainDetails mockTrain = new SearchTrainFrame.TrainDetails("12051", "Janshatabdi Express", 1200, 500, 1800);
         SwingUtilities.invokeLater(() -> new BookingFrame(mockTrain));
     }
@@ -93,12 +113,12 @@ public class BookingFrame extends JFrame {
     private final int RADIUS = 8;
     private static final String RUPEE_SYMBOL = "\u20B9";
 
-    // IMPORTANT: The type here must match the type in SearchTrainFrame!
+    
     private final SearchTrainFrame.TrainDetails selectedTrain;
     private JTextField trainNameField, seatCountField;
     private final DBManager dbManager = new DBManager();
 
-    // IMPORTANT: The constructor must accept SearchTrainFrame.TrainDetails!
+    
     public BookingFrame(SearchTrainFrame.TrainDetails trainDetails) {
         this.selectedTrain = trainDetails;
 
@@ -125,7 +145,7 @@ public class BookingFrame extends JFrame {
         mainPanel.setBackground(BACKGROUND_BLACK);
         mainPanel.setBorder(new EmptyBorder(10, 20, 10, 20));
 
-        JLabel titleLabel = new JLabel("🎟️ Ticket Booking", SwingConstants.CENTER);
+        JLabel titleLabel = new JLabel("🎟 Ticket Booking", SwingConstants.CENTER);
         titleLabel.setFont(new Font("Segoe UI Emoji", Font.BOLD, 36));
         titleLabel.setForeground(PRIMARY_COLOR);
         mainPanel.add(titleLabel, BorderLayout.NORTH);
@@ -172,6 +192,29 @@ public class BookingFrame extends JFrame {
         gbc.anchor = GridBagConstraints.CENTER;
         formPanel.add(confirmBtn, gbc);
 
+        JPanel seatInfoPanel = createSeatInfoPanel();
+
+        JPanel centerContainer = new JPanel(new GridBagLayout());
+        centerContainer.setBackground(BACKGROUND_BLACK);
+        
+        GridBagConstraints centerGBC = new GridBagConstraints();
+        centerGBC.fill = GridBagConstraints.NONE;
+        centerGBC.anchor = GridBagConstraints.CENTER;
+        
+        JPanel contentWrapper = new JPanel();
+        contentWrapper.setLayout(new BoxLayout(contentWrapper, BoxLayout.X_AXIS));
+        contentWrapper.setBackground(BACKGROUND_BLACK);
+        contentWrapper.add(seatInfoPanel);
+        // Reduced rigid area gap from 50 to 30 for compactness
+        contentWrapper.add(Box.createRigidArea(new Dimension(30, 0)));
+        contentWrapper.add(formPanel);
+        
+        centerGBC.gridx = 0;
+        centerGBC.gridy = 0;
+        centerContainer.add(contentWrapper, centerGBC);
+
+        mainPanel.add(centerContainer, BorderLayout.CENTER);
+
         confirmBtn.addActionListener(e -> {
             try {
                 String name = passengerName.getText().trim();
@@ -186,16 +229,51 @@ public class BookingFrame extends JFrame {
 
                 int age = Integer.parseInt(ageStr);
 
+                int currentAvailable = 0;
+                switch (selectedClass) {
+                    case "AC":
+                        currentAvailable = availableACSeats;
+                        break;
+                    case "Sleeper":
+                        currentAvailable = availableSleeperSeats;
+                        break;
+                    case "Business":
+                        currentAvailable = availableBusinessSeats;
+                        break;
+                }
+
+                if (seats > currentAvailable) {
+                    JOptionPane.showMessageDialog(this,
+                        "Booking failed. Only " + currentAvailable + " seats available in " + selectedClass + ".",
+                        "Seat Availability Error", JOptionPane.ERROR_MESSAGE);
+                    return;
+                }
+
                 int totalAmount = calculatePrice(selectedTrain, selectedClass, seats);
 
                 if (dbManager.saveBooking(selectedTrain.id, name, age, selectedClass, seats, totalAmount)) {
+                    
+                    switch (selectedClass) {
+                        case "AC":
+                            availableACSeats -= seats;
+                            break;
+                        case "Sleeper":
+                            availableSleeperSeats -= seats;
+                            break;
+                        case "Business":
+                            availableBusinessSeats -= seats;
+                            break;
+                    }
+                    
+                    updateSeatDisplay();
+
                     JOptionPane.showMessageDialog(this,
                             String.format("Booking Confirmed! ✅\n\nTrain: %s\nClass: %s\nSeats: %d\nTotal: %s%d",
                                     selectedTrain.name, selectedClass, seats, RUPEE_SYMBOL, totalAmount),
                             "Booking Confirmation", JOptionPane.INFORMATION_MESSAGE);
                 }
 
-                // Clear fields for new booking
+                
                 passengerName.setText("");
                 ageField.setText("");
                 seatCountField.setText("1");
@@ -206,9 +284,10 @@ public class BookingFrame extends JFrame {
             }
         });
 
-        mainPanel.add(formPanel, BorderLayout.CENTER);
         add(mainPanel);
         setVisible(true);
+
+        updateSeatDisplay();
     }
 
     private int calculatePrice(SearchTrainFrame.TrainDetails train, String cls, int seats) {
@@ -225,6 +304,59 @@ public class BookingFrame extends JFrame {
                 break;
         }
         return basePrice * seats;
+    }
+
+    private void updateSeatDisplay() {
+        acAvailableLabel.setText(availableACSeats + " Available");
+        sleeperAvailableLabel.setText(availableSleeperSeats + " Available");
+        businessAvailableLabel.setText(availableBusinessSeats + " Available");
+    }
+
+    private JPanel createSeatInfoPanel() {
+        // Reduced GridLayout spacing from 10, 10 to 8, 8 for compactness
+        JPanel panel = new JPanel(new GridLayout(4, 1, 8, 8));
+        panel.setBackground(FIELD_BACKGROUND);
+        
+        // Reduced EmptyBorder padding and applied a rounded border (curvy border)
+        panel.setBorder(BorderFactory.createCompoundBorder(
+                // The 'true' argument tells Nimbus L&F to round the corners
+                BorderFactory.createLineBorder(PRIMARY_COLOR, 2, true), 
+                // Reduced padding from 15, 20 to 10, 15
+                new EmptyBorder(10, 15, 10, 15) 
+        ));
+
+        // Slightly smaller font for the title to contribute to compactness
+        JLabel title = new JLabel("Train Seat Availability", SwingConstants.CENTER);
+        title.setFont(new Font("Segoe UI Emoji", Font.BOLD, 16));
+        title.setForeground(PRIMARY_COLOR);
+        panel.add(title);
+
+        acAvailableLabel = new JLabel();
+        sleeperAvailableLabel = new JLabel();
+        businessAvailableLabel = new JLabel();
+
+        panel.add(createSeatRow("AC (Total: " + TOTAL_AC + ")", acAvailableLabel));
+        panel.add(createSeatRow("Sleeper (Total: " + TOTAL_SLEEPER + ")", sleeperAvailableLabel));
+        panel.add(createSeatRow("Business (Total: " + TOTAL_BUSINESS + ")", businessAvailableLabel));
+
+        return panel;
+    }
+
+    private JPanel createSeatRow(String classText, JLabel availableLabel) {
+        // Reduced gap from 10, 0 to 5, 0 for tighter spacing
+        JPanel row = new JPanel(new BorderLayout(5, 0));
+        row.setBackground(FIELD_BACKGROUND);
+
+        JLabel classLabel = new JLabel(classText);
+        classLabel.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 14));
+        classLabel.setForeground(FOREGROUND_LIGHT);
+
+        availableLabel.setFont(new Font("Segoe UI Emoji", Font.BOLD, 14));
+        availableLabel.setForeground(ACTION_COLOR);
+
+        row.add(classLabel, BorderLayout.WEST);
+        row.add(availableLabel, BorderLayout.EAST);
+        return row;
     }
 
     private JLabel createStyledLabel(String text) {
